@@ -614,7 +614,7 @@ class Agent:
                 )
                 steps.append(step)
                 # Display [Final Answer] in red so the user clearly distinguishes the conclusion
-                self._log(f"\n\033[1;31m[Final Answer]:\033[0m\n\033[91m{final_answer}\033[0m")
+                self._log(f"\n\033[1;31m[Final Answer]:\033[0m\n {final_answer}")
                 break
         else:
             final_answer = "Maximum reasoning loop iterations reached without final answer."

@@ -46,7 +46,7 @@ def print_tools_table(current_role: UserRole) -> None:
 def interactive_repl(agent: Agent) -> None:
     """Run interactive terminal loop for agent interaction."""
     print("\n" + "=" * 65)
-    print("   SAFE LIBRARY AI AGENT (Topic 07: Autonomous Agents & Safety)")
+    print("   SAFE LIBRARY AI AGENT")
     print("=" * 65)
     print(f"Logged in as: {agent.user_context.username} | Role: {agent.user_context.role.value.upper()}")
     print(f"Model Backend: {agent.config.model_name} (Provider: {agent.config.provider})")
