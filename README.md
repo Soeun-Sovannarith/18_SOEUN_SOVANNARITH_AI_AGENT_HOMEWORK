@@ -17,17 +17,14 @@ The application enforces security, permissions, and input validation in Python a
 
 ## 2. Available Tools & Schemas
 
-The agent has access to 7 database-backed tools with explicit Pydantic input schemas and risk tier classifications:
+The agent has access to 4 database-backed tools with explicit Pydantic input schemas and risk tier classifications:
 
 | Tool Name | Risk Tier | Input Schema | Description |
 | :--- | :--- | :--- | :--- |
-| `search_books` | GREEN | `query: str`, `category: Optional[str]` | Searches library database catalog by title, author, keyword, or genre. |
-| `get_book_details` | GREEN | `book_id: int` (`> 0`) | Reads complete book record, metadata, and description from the database by ID. |
-| `check_availability` | GREEN | `book_id: int` (`> 0`) | Reads available copy count, total inventory, and shelf location from the database. |
-| `borrow_book` | YELLOW | `book_id: int` (`> 0`), `duration_days: int` (`1-30`, default: `14`) | Borrows a book copy, decrements available shelf copies in database, and creates an active loan receipt with due date. |
-| `return_book` | YELLOW | `loan_id: str` (`min_length=3`) | Returns a borrowed book, marks loan as returned in database, and restores available copy count. |
-| `get_loan_status` | GREEN | `loan_id: str` (`min_length=3`) | Reads active loan information, book title, and return due date from database. |
-| `delete_book` | RED | `book_id: int` (`> 0`) | Permanently deletes a book from the database catalog (Librarian only). |
+| `get_all_books` | 🟢 GREEN | `search_query: Optional[str]`, `category: Optional[str]` | Retrieves all books in the catalog, browse inventory, or filter by keyword/genre. |
+| `get_book_details` | 🟢 GREEN | `book_id: int` (`> 0`) | Reads complete book record, metadata, available copies, and shelf location from the database by ID. |
+| `loan_book` | 🟡 YELLOW | `book_id: int` (`> 0`), `duration_days: Optional[int]` (`1-30`, default: `14`) | Loans a book copy, decrements available shelf copies in database, and creates an active loan receipt with due date. |
+| `return_book` | 🟡 YELLOW | `loan_id: str` (`min_length=3`) | Returns a loaned book, marks loan as returned in database, and restores available copy count. |
 
 ---
 
@@ -270,24 +267,32 @@ Your current role is 'MEMBER'. This operation requires librarian / administrativ
 
 ---
 
-### Example 5: Librarian Deletes Book (Authorized)
+### Example 5: Return Book (Authorized)
 ```bash
-$ python3 main.py --role librarian --query "Delete book ID 1 from the catalog"
+$ python3 main.py --role member --query "Return loan LOAN-1001 to the library"
 ```
 ```text
-[USER REQUEST]: 'Delete book ID 1 from the catalog'
-[USER ROLE]: LIBRARIAN
+[USER REQUEST]: 'Return loan LOAN-1001 to the library'
+[USER ROLE]: MEMBER
 -----------------------------------------------------------------
 
 [Step 1/6]
-[Thought]: Attempting to delete book ID 1.
-[Action Proposed]: delete_book({'book_id': 1})
+[Thought]: Returning book for loan LOAN-1001.
+[Action Proposed]: return_book({'loan_id': 'LOAN-1001'})
 [Observation]:
-[DELETE_SUCCESS] Book 'Clean Code: A Handbook of Agile Software Craftsmanship' (ID: 1) was permanently removed from the library database.
+[RETURN_SUCCESS]
+Loan ID:     LOAN-1001
+Book Title:  'Introduction to Algorithms (CLRS)'
+Status:      Returned
+Message:     Book successfully returned to the library inventory.
 
 [Step 2/6]
 [Final Answer]:
-Administrative action complete: [DELETE_SUCCESS] Book 'Clean Code: A Handbook of Agile Software Craftsmanship' (ID: 1) was permanently removed from the library database.
+[RETURN_SUCCESS]
+Loan ID:     LOAN-1001
+Book Title:  'Introduction to Algorithms (CLRS)'
+Status:      Returned
+Message:     Book successfully returned to the library inventory.
 ```
 
 ---
@@ -296,14 +301,13 @@ Administrative action complete: [DELETE_SUCCESS] Book 'Clean Code: A Handbook of
 
 ```
 .
-├── README.md                                    # Project documentation
+├── README.md                                    # Comprehensive project documentation
 ├── main.py                                      # Application CLI, interactive REPL, and role switcher
-├── agent.py                                     # Agent loop with LLM drivers & fallback
-├── tools.py                                     # Database access manager (Postgres/SQLite) and schemas
+├── agent.py                                     # Agent ReAct loop with LLM drivers & fallback
+├── tools.py                                     # Database manager (Postgres/SQLite) & 4 core tools
 ├── schemas.py                                   # Data models for messages, tools, roles, and traces
-├── harness.py                                   # Permission guard & automated test suite
+├── harness.py                                   # Safety harness & automated benchmark suite
 ├── db.sql                                       # PostgreSQL schema & initial seed data script
-├── library.db                                   # SQLite database file (fallback)
 ├── harness_results.json                         # Benchmark test evaluation results
 ├── requirements.txt                             # Python dependencies
 ├── .env.example                                 # Environment configuration template

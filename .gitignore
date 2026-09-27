@@ -5,5 +5,7 @@ __pycache__/
 env/
 venv/
 .env
+*.db
+*.sqlite
 harness_results.json
 .DS_Store

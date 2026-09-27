@@ -14,16 +14,13 @@ class UserRole(str, Enum):
     """User roles for application-level RBAC permission control."""
     MEMBER = "member"
     LIBRARIAN = "librarian"
-    CUSTOMER = "customer"
-    ADMIN = "admin"
 
     @classmethod
     def normalize(cls, role_input: Union[str, "UserRole"]) -> "UserRole":
         """Normalize role string or enum to canonical role."""
         if isinstance(role_input, UserRole):
-            r = role_input.value
-        else:
-            r = str(role_input).strip().lower()
+            return role_input
+        r = str(role_input).strip().lower()
         if r in ("librarian", "admin"):
             return cls.LIBRARIAN
         return cls.MEMBER
@@ -50,43 +47,32 @@ class PermissionCheckResult(BaseModel):
     risk_level: RiskLevel = Field(default=RiskLevel.GREEN, description="Risk tier of the tool")
 
 
-# Tool Input Schemas
+# Tool Input Schemas for the 4 Core Library Tools
 
-class SearchBooksInput(BaseModel):
-    """Schema for search_books tool."""
-    query: str = Field(default="", description="Keywords to search library catalog (title, author, topic). Use empty string '' or 'all' to list all books in catalog.")
+class GetAllBooksInput(BaseModel):
+    """Schema for get_all_books tool."""
+    search_query: Optional[str] = Field(default="", description="Optional keyword to search or filter book titles, authors, or topics. Leave empty to list all books.")
     category: Optional[str] = Field(default=None, description="Optional category filter")
-
-
-class CheckAvailabilityInput(BaseModel):
-    """Schema for check_availability tool."""
-    book_id: int = Field(..., gt=0, description="Positive integer ID of the book")
 
 
 class GetBookDetailsInput(BaseModel):
     """Schema for get_book_details tool."""
-    book_id: int = Field(..., gt=0, description="Positive integer ID of the book to retrieve from the database")
+    book_id: int = Field(..., gt=0, description="Positive integer ID of the book to retrieve details and shelf location for")
 
 
-class BorrowBookInput(BaseModel):
-    """Schema for borrow_book tool."""
-    book_id: int = Field(..., gt=0, description="Positive integer ID of the book to borrow")
-    duration_days: int = Field(default=14, gt=0, le=30, description="Borrow duration in days (between 1 and 30 days)")
+class LoanBookInput(BaseModel):
+    """Schema for loan_book tool."""
+    book_id: int = Field(..., gt=0, description="Positive integer ID of the book to loan. If you only have the book title, call get_all_books first to find the book_id.")
+    duration_days: Optional[int] = Field(default=14, gt=0, le=30, description="Loan duration in days (between 1 and 30 days, defaults to 14 if omitted).")
+
+
+# Alias for backward compatibility if referenced
+BorrowBookInput = LoanBookInput
 
 
 class ReturnBookInput(BaseModel):
     """Schema for return_book tool."""
-    loan_id: str = Field(..., min_length=3, description="Active Loan identifier string (e.g. 'LOAN-1001')")
-
-
-class GetLoanStatusInput(BaseModel):
-    """Schema for get_loan_status tool."""
-    loan_id: str = Field(..., min_length=3, description="Loan identifier string (e.g. 'LOAN-1001')")
-
-
-class DeleteBookInput(BaseModel):
-    """Schema for delete_book tool (Librarian only)."""
-    book_id: int = Field(..., gt=0, description="Positive integer ID of the book to delete")
+    loan_id: str = Field(..., min_length=1, description="Active Loan identifier string (e.g. 'LOAN-1001'), Book Title (e.g. 'Clean Code'), or Book ID to return.")
 
 
 # Message and Tool Calling Schemas
@@ -148,8 +134,12 @@ class ChatMessage(BaseModel):
                     "type": tc.type,
                     "function": {
                         "name": tc.function.name,
-                        "arguments": tc.function.arguments if isinstance(tc.function.arguments, str)
-                        else str(tc.function.arguments)
+                        "arguments": tc.function.arguments if isinstance(tc.function.arguments, dict)
+                        else (
+                            json.loads(tc.function.arguments)
+                            if isinstance(tc.function.arguments, str) and tc.function.arguments.strip().startswith("{")
+                            else tc.function.arguments
+                        )
                     }
                 }
                 for tc in self.tool_calls
@@ -210,25 +200,4 @@ class AgentResponse(BaseModel):
     error: Optional[str] = Field(default=None)
 
 
-# Test Case Models
 
-class TestCase(BaseModel):
-    """Test case definition for harness benchmark."""
-    name: str = Field(..., description="Test name")
-    query: str = Field(..., description="User prompt")
-    role: UserRole = Field(default=UserRole.MEMBER, description="Role context for this test")
-    expected_tools: Optional[List[str]] = Field(default=None, description="Expected tools called")
-    expected_permission_denied: bool = Field(default=False, description="Whether permission should be rejected")
-    expected_substrings: Optional[List[str]] = Field(default=None, description="Keywords expected in answer")
-    max_steps: int = Field(default=6)
-
-
-class HarnessResult(BaseModel):
-    """Result of evaluating a test case."""
-    test_case: str = Field(...)
-    role: str = Field(...)
-    passed: bool = Field(...)
-    details: str = Field(...)
-    execution_time: float = Field(default=0.0)
-    steps_taken: int = Field(default=0)
-    tools_used: List[str] = Field(default_factory=list)

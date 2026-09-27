@@ -1,7 +1,7 @@
 """
 Main Application Entry Point for the Library AI Agent.
 Starts the Library Agent application with interactive REPL,
-role switching (Member vs Librarian), single-query CLI mode, and benchmark harness trigger.
+role switching (Member vs Librarian), and single-query CLI mode.
 """
 
 from __future__ import annotations
@@ -10,16 +10,9 @@ import sys
 from typing import Optional
 
 from agent import Agent
-from harness import SafetyHarness, run_benchmark_suite
+from harness import SafetyHarness, ROLE_PERMISSIONS
 from schemas import AgentConfig, UserContext, UserRole
 from tools import registry
-
-
-BANNER = r"""
-========================================================================
-   SAFE LIBRARY AI AGENT (Topic 07: Autonomous Agents & Safety)
-========================================================================
-"""
 
 
 def print_help() -> None:
@@ -30,7 +23,6 @@ Available Commands:
   /tools                    - List available tools, schemas, and permissions
   /status                   - Show active user, role, and model configuration
   /reset                    - Clear agent conversation memory and reset loan state
-  /test                     - Run automated safety and permission benchmark suite
   /help                     - Display this help message
   /exit or q                - Exit the application
 """)
@@ -38,8 +30,6 @@ Available Commands:
 
 def print_tools_table(current_role: UserRole) -> None:
     """Display table of tools with permission and risk level."""
-    from harness import ROLE_PERMISSIONS
-
     allowed_tools = ROLE_PERMISSIONS.get(current_role, [])
     print("\n" + "=" * 75)
     print(f" REGISTERED LIBRARY TOOLS (Current Role: {current_role.value.upper()})")
@@ -48,14 +38,16 @@ def print_tools_table(current_role: UserRole) -> None:
     print("-" * 75)
 
     for td in registry.get_definitions():
-        is_allowed = "ALLOWED" if td.name in allowed_tools else "FORBIDDEN"
+        is_allowed = "ALLOWED" if td.name in allowed_tools else "BLOCKED"
         print(f"{td.name:<20} | {td.risk_level.value.upper():<10} | {is_allowed:<12} | {td.description[:35]}")
     print("=" * 75 + "\n")
 
 
 def interactive_repl(agent: Agent) -> None:
     """Run interactive terminal loop for agent interaction."""
-    print(BANNER)
+    print("\n" + "=" * 65)
+    print("   SAFE LIBRARY AI AGENT (Topic 07: Autonomous Agents & Safety)")
+    print("=" * 65)
     print(f"Logged in as: {agent.user_context.username} | Role: {agent.user_context.role.value.upper()}")
     print(f"Model Backend: {agent.config.model_name} (Provider: {agent.config.provider})")
     print("Type your message or type '/help' for command options. Enter '/exit' to quit.\n")
@@ -92,10 +84,6 @@ def interactive_repl(agent: Agent) -> None:
                 print(f"Role: {agent.user_context.role.value.upper()}")
                 print(f"Model: {agent.config.model_name}")
                 print(f"Max Steps: {agent.config.max_steps}\n")
-                continue
-
-            if user_input.lower() == "/test":
-                run_benchmark_suite()
                 continue
 
             if user_input.lower().startswith("/role"):
@@ -152,21 +140,12 @@ def main() -> None:
         help="Run a single-shot query and exit",
     )
     parser.add_argument(
-        "--test",
-        action="store_true",
-        help="Run the automated test and safety benchmark suite",
-    )
-    parser.add_argument(
         "--quiet",
         action="store_true",
         help="Disable verbose step traces",
     )
 
     args = parser.parse_args()
-
-    if args.test:
-        run_benchmark_suite()
-        return
 
     canonical_role = UserRole.normalize(args.role)
     user_ctx = UserContext(
